@@ -1,4 +1,4 @@
-# DArTseq_analyses
+# Genomic analyses (DArTseq data)
 Scripts follow the order:
   1. filtering.R
   2. outlier_removal.R
