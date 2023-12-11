@@ -1,20 +1,20 @@
-# gl_filtering.R appliers filtering steps on DArTseq raw data for analyses.
+# gl_filtering.R: steps on filtering DArTseq raw data for analyses.
 
 # ---------------------------------------------------------------------------#
 #                                                                            #
 #                               DArTseq analyses                             #
 #                             By Jessica FR Coelho                           #
 #                             jessicovsky@gmail.com                          #
-#                                   Mar 2022                                 #
+#                                   Nov 2023                                 #
 #                                                                            #
 # ---------------------------------------------------------------------------#
-# Get working directory
+# Check working directory
 getwd()
 
-# Get messages in English
+# Get error messages in English
 Sys.setenv(lang = "en_US")
 
-# Load the package then libraries
+# Load libraries
 Sys.which("make") #"C:\\rtools40\\usr\\bin\\make.exe"
 library(dartR)
 library(devtools)
@@ -27,7 +27,7 @@ library(terra)
 dart <- gl.read.dart(filename = "dartseqdata_genomebased/Report_DHare21-6652_SNP_2_bylat.csv",
                      ind.metafile = "dartseqdata_genomebased/SampleFile-DHare21-6652-my_metadata.csv")
 dart
-# 91 genotypes,  98,313 binary SNPs, 30% missing data
+# 91 genotypes,  98,313 binary SNPs, 30.35% missing data
 
 # Producing a heatmap with the raw data
 glPlot(dart,
@@ -36,14 +36,36 @@ glPlot(dart,
                "Gold"),
        legend = T)
 
-# Ordering SNPs by callrate then plot heatmap
+# Ordering SNPs by callrate then plot heatmap again
 dart2 <- dart[ ,order(dart@other$loc.metrics$CallRate, decreasing = TRUE)] 
 dart2
 
 # -------------------------------------------------------------------------- #
-#                             Subseting data                                 #
+#                   Drop putative sex-linked SNPs                            #
 # -------------------------------------------------------------------------- #
-# Harengula thrissina outlier:
+# Import and remove 'outlier' alleles - identified in outlier_removal.R
+dropalleles <- read.csv(file = "alleles2remove.csv",
+                        header = TRUE)
+View(dropalleles) #166 alleles
+
+# Now remove chrs after . of the alleles name to match gl pattern
+rname_alleles <- gsub("\\..*", "", dropalleles$rmv_alleles)
+rmv_alleles <- cbind(rname_alleles, dropalleles[ ,3:5])
+View(rmv_alleles)
+
+# Remove alleles
+gl_dropalleles <- gl.drop.loc(dart,
+                              loc.list = rmv_alleles$rname_alleles,
+                              verbose = 3)
+#Summary of recoded dataset
+#Original No. of loci: 98313 
+#No. of loci deleted: 166 
+#No. of loci retained: 98147 
+
+# -------------------------------------------------------------------------- #
+#                             Subseting dataset                              #
+# -------------------------------------------------------------------------- #
+# Harengula thrissina outgroup:
 mex <- gl.keep.pop(dart, pop.list = c("MEX"))
 mex  #98.19 % missing data -> remove
 
@@ -51,54 +73,59 @@ mex  #98.19 % missing data -> remove
 bra <- gl.keep.pop(dart, pop.list = c("FNO", "CE", "RN", "PB",
                                       "PE", "AL", "BA", "ABR",
                                       "ES", "RJ", "SP", "SC"))
-bra  #89 genotypes, 98,313 binary SNPs, 28.82 % missing data
+bra  #89 genotypes,  98,147 SNPs, 28.86% missing data
 
 # --------------------------------------------------------------------------- #
-#                             Filtering data                                  #
-# CR/ind (t=0.6) > Reproducibility (t=.99) > Monomorphs > Unlinked > Paralogs #
+#                     Filtering dataset I: linked-SNPs                        #
+#               Nucleotide diversity (pi, Fit) and Tajima's D                 #
+#                  CR/ind (t=0.6) > Reproducibility (t=.99)                   #
 # --------------------------------------------------------------------------- #
 # Call rate per individual
 gl0 <- gl.filter.callrate(bra,
                           method = "ind",
                           t = 0.6)
-gl0 #86 genotypes, 98,313 binary SNPs, 28.06 % MD
+gl0 #86 genotypes, 98,147 binary SNPs, 28.11 % MD
 # Removed CE08[CE], CE11[CE], SP02[SP]
 
 # Reproducibility
 gl1 <- gl.filter.reproducibility(gl0, t = 0.99)
-gl1 #86 genotypes, 88,747 binary SNPs, 29.47 % MD
+gl1 #86 genotypes, 88,639 binary SNPs, 29.5 % MD
 
+# Call rate per locus: dataset linked-SNPs-0MD
+gl1D <- gl.filter.callrate(gl1, threshold = 1)
+gl1D #86 genotypes,	9,369 binary SNPs, 0 % MD
+#Export dataset to run DNAsp and calculate Tajima's D
+
+# --------------------------------------------------------------------------- #
+#                Filtering dataset II: unlinked-best-SNPs                     #
+#               Population structure (PCoA, STRUCTURE, Fst)                   #
+# CR/ind (t=0.6) > Reproducibility (t=.99) > Monomorphs > Secondaries (best)  #
+# --------------------------------------------------------------------------- #
 # Monomorphs
 gl2 <- gl.filter.monomorphs(gl1, v = 5)
-gl2 #86 genotypes, 85,210 binary SNPs, 30.07 % MD
+gl2 #antes, com gl1: 86 genotypes, 85,102 binary SNPs, 30.1 % MD
+#_maf: 86 genotypes,  36,287 SNPs, 38.84% MD
 
 # Secondaries
 gl3 <- gl.filter.secondaries(gl2, method = "best")
-gl3 #86 genotypes, 60,071 binary SNPs, 33.96 % MD
-
-# Paralogs
-gl4 <- gl.filter.hamming(gl3, threshold = 0.2, pb = T, v = 5)
-gl4 <- gl3p #Both the same; I just renamed to keep pattern
-gl4 #86 genotypes, 29,342 binary SNPs, 21.04 % MD
-
-# After removing 'outlier' alleles
-gl3p_dropalleles #86 genotypes, 29,176 binary SNPs, 21.14 % MD
+gl3 #antes: 86 genotypes, 59,992 binary SNPs, 34 % MD
+# 86 genotypes,  30,844 SNPs, 39.9% MD
 
 # --------------------------------------------------------------------------- #
-#                    Average n of SNPs per locus                              #
+#                  Filtering dataset III: unlinked-random-SNPs                #
+#                             Demography (dadi)                               #
+# CR/ind (t=0.6) > Reproducibility (t=.99) > Monomorphs > Secondaries (random)#
 # --------------------------------------------------------------------------- #
-gl.report.secondaries(dart2)
+# Secondaries
+gl4 <- gl.filter.secondaries(gl2, method = "random")
+gl4 #86 genotypes, 59,992 binary SNPs, 34.01 % MD
 
 # --------------------------------------------------------------------------- #
-#                                   PCoA                                      #
+#                                Useful commands                              #
 # --------------------------------------------------------------------------- #
-pc_split <- gl.pcoa(gl4, nfactors = 5)
-gl.pcoa.plot(pc_split,
-             gl4,
-             xaxis = 1,
-             yaxis = 2)
+gl.report.secondaries(dart) #Average n of SNPs per locus 
+gl.report.heterozygosity(gl1, method = "ind") #Heterozygosity
 
-# Remove alleles driving localities to split in outlier_removal.R
 # --------------------------------------------------------------------------- #
 #                            jessicovsky@gmail.com                            #
 # --------------------------------------------------------------------------- #
