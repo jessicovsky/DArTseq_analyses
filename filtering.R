@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------#
 #                                                                            #
 #                               DArTseq analyses                             #
-#                             By Jessica FR Coelho                           #
+#                      By Jessica FR Coelho & Julia T Verba                  #
 #                             jessicovsky@gmail.com                          #
 #                                   Nov 2023                                 #
 #                                                                            #
@@ -77,7 +77,7 @@ bra  #89 genotypes,  98,147 SNPs, 28.86% missing data
 
 # --------------------------------------------------------------------------- #
 #                     Filtering dataset I: linked-SNPs                        #
-#               Nucleotide diversity (pi, Fit) and Tajima's D                 #
+#               Nucleotide diversity (pi, Fis) and Tajima's D                 #
 #                  CR/ind (t=0.6) > Reproducibility (t=.99)                   #
 # --------------------------------------------------------------------------- #
 # Call rate per individual
@@ -94,7 +94,11 @@ gl1 #86 genotypes, 88,639 binary SNPs, 29.5 % MD
 # Call rate per locus: dataset linked-SNPs-0MD
 gl1D <- gl.filter.callrate(gl1, threshold = 1)
 gl1D #86 genotypes,	9,369 binary SNPs, 0 % MD
-#Export dataset to run DNAsp and calculate Tajima's D
+
+# Export dataset to run DNAsp and calculate Tajima's D
+gl2fasta(gl1D,
+         method = 1,
+         outfile = "DNAsp_again/tajD_DNAsp1.fasta")
 
 # --------------------------------------------------------------------------- #
 #                Filtering dataset II: unlinked-best-SNPs                     #
@@ -103,13 +107,11 @@ gl1D #86 genotypes,	9,369 binary SNPs, 0 % MD
 # --------------------------------------------------------------------------- #
 # Monomorphs
 gl2 <- gl.filter.monomorphs(gl1, v = 5)
-gl2 #antes, com gl1: 86 genotypes, 85,102 binary SNPs, 30.1 % MD
-#_maf: 86 genotypes,  36,287 SNPs, 38.84% MD
+gl2 # 86 genotypes, 85,102 binary SNPs,	30.1 % MD
 
 # Secondaries
 gl3 <- gl.filter.secondaries(gl2, method = "best")
-gl3 #antes: 86 genotypes, 59,992 binary SNPs, 34 % MD
-# 86 genotypes,  30,844 SNPs, 39.9% MD
+gl3 #86 genotypes, 59,992 binary SNPs, 34 % MD
 
 # --------------------------------------------------------------------------- #
 #                  Filtering dataset III: unlinked-random-SNPs                #
@@ -121,7 +123,7 @@ gl4 <- gl.filter.secondaries(gl2, method = "random")
 gl4 #86 genotypes, 59,992 binary SNPs, 34.01 % MD
 
 # --------------------------------------------------------------------------- #
-#                                Useful commands                              #
+#                            Other useful commands                            #
 # --------------------------------------------------------------------------- #
 gl.report.secondaries(dart) #Average n of SNPs per locus 
 gl.report.heterozygosity(gl1, method = "ind") #Heterozygosity
