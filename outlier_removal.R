@@ -1,37 +1,42 @@
+# outlier_removal: remove putatively sex-linked SNPs. 
 # ---------------------------------------------------------------------------#
 #                                                                            #
 #                               DArTseq analyses                             #
-#                             By Jessica FR Coelho                           #
+#                      By Jessica FR Coelho & Julia T Verba                  #
 #                             jessicovsky@gmail.com                          #
-#                                   Feb 2022                                 #
+#                                   Nov 2023                                 #
 #                                                                            #
 # ---------------------------------------------------------------------------#
-# Get working directory
+# Check working directory
 getwd()
 
-# Get messages in English
+# Get error messages in English
 Sys.setenv(lang = "en_US")
 
-# Load the package then libraries
+# Load libraries
 Sys.which("make") #"C:\\rtools40\\usr\\bin\\make.exe"
 library(dartR)
 library(devtools)
 library(terra)
 
 # -------------------------------------------------------------------------- #
+#                    Visualize duplicated pattern in PCA                     #
+# -------------------------------------------------------------------------- #
+gl.pcoa.plot(pc,
+             dart,
+             xaxis = 1,
+             yaxis = 2)
+
+# -------------------------------------------------------------------------- #
 #                  Cleaning outlier alleles from dataset                     #
 # -------------------------------------------------------------------------- #
-# Import gl filtered by: 
-# CR/ind (t=0.6) > Rep (t=0.99) > Mono > Sec (m=best) > Paralogs (t=0.2)
-gl3p <- readRDS("gl3p.Rdata")
-
-# Import PCoA with duplicated pattern:
+# Import PCA with duplicated pattern:
 pc <- readRDS("pc_duplicated_gl3p.Rdata")
 
 # Visualize
 par(mfrow=c(1,1))
 gl.pcoa.plot(pc,
-             gl3p,
+             dart,
              xaxis = 1,
              yaxis = 2)
 pc$scores
@@ -50,7 +55,7 @@ View(all_alleles)
 #                             Thresholds in PC2                               #
 #                                module 0.035                                 #
 # --------------------------------------------------------------------------- #
-# Slowly check and investigate alleles to remove
+# Check and investigate alleles to remove
 # Thresholds below and above which to remove alleles
 t <- as.numeric(-0.035)
 t2 <- as.numeric(0.035)
@@ -85,9 +90,9 @@ rmv_alleles <- cbind(rname_alleles2, alleles2remove[ ,2:5])
 View(rmv_alleles)
 
 # Remove alleles
-gl3p_dropalleles <- gl.drop.loc(gl3p,
-                                loc.list = rmv_alleles$rname_alleles2,
-                                verbose = 3)
+gl_new <- gl.drop.loc(dart,
+                      loc.list = rmv_alleles$rname_alleles2,
+                      verbose = 3)
 #Original No. of loci: 29342 
 #No. of loci deleted: 166 
 #No. of loci retained: 29176 
@@ -95,45 +100,30 @@ gl3p_dropalleles <- gl.drop.loc(gl3p,
 #No. of populations:  12 
 
 # Do a PCoA with the new genlight object to visualize new pattern
-pc_rmvalleles <- gl.pcoa(gl3p_dropalleles, nfactors = 5)
+pc_rmvalleles <- gl.pcoa(gl_new, nfactors = 5)
 gl.pcoa.plot(pc_rmvalleles,
-             gl3p_dropalleles,
+             gl_new,
              xaxis = 1,
              yaxis = 2)
 gl.pcoa.plot(pc_rmvalleles,
-             gl3p_dropalleles,
+             gl_new,
              xaxis = 3,
              yaxis = 4)
-
 gl.pcoa.plot(pc_rmvalleles,
-             gl3p_dropalleles,
+             gl_new,
              xaxis = 1,
              yaxis = 3)
 
 # Heatmap of the 166 removed alleles
-gl3p_keepdrop <- gl.keep.loc(gl3p,
-                             loc.list = rmv_alleles$rname_alleles2,
-                             verbose = 3)
-gl3p_keepdrop_ordered <- gl3p_keepdrop[ ,order(gl3p_keepdrop$other$loc.metrics$CallRate,
-                                               decreasing = TRUE)]
-glPlot(gl3p_keepdrop_ordered,
+gl_new_htmap <- gl.keep.loc(gl_new,
+                            loc.list = rmv_alleles$rname_alleles2,
+                            verbose = 3)
+glPlot(gl_new_htmap,
        col = c("DeepSkyBlue",
                "DeepPink1",
                "Gold"),
        legend = T)
-saveRDS(gl3p_keepdrop_ordered, file = "gl3p_keepdrop_ordered.Rdata")
-gl3p_keepdrop_ordered <- readRDS("gl3p_keepdrop_ordered.Rdata")
-
-# -------------------------------------------------------------------------- #
-#                            Hardy-Weinberg filter                           #
-# -------------------------------------------------------------------------- #
-# Import gl filtered by: 
-# CR/ind (t=0.6) > Rep (t=0.99) > Mono > Sec (m=best) > Paralogs (t=0.2)
-gl3p <- readRDS("gl3p.Rdata")
-gl3p       
-
-gl3p_hw <- gl.filter.hwe(gl3p, verbose = 3)
-gl3p_hw    #equal genotypes, binary SNPs and % MD
+saveRDS(gl_new_htmap, file = "gl_new_htmap.Rdata")
 
 # --------------------------------------------------------------------------- #
 #                            jessicovsky@gmail.com                            #
